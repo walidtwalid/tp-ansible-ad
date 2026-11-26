@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh : installe tout le nécessaire sur la VM Ubuntu (Ubuntu 22.04).
+# install.sh : installe tout le nécessaire sur la machine Linux (Debian ou Ubuntu).
 # Utilisation, depuis le dossier tp-ansible-ad :
 #   bash install.sh
 set -e
@@ -9,7 +9,11 @@ sudo apt update
 sudo apt install -y python3-pip
 
 echo "==> Installation d'Ansible et de pywinrm (pour piloter Windows)"
-python3 -m pip install --user ansible pywinrm
+# Les versions récentes de Debian et d'Ubuntu (Ubuntu 23.04 et plus, Debian 12)
+# bloquent pip par défaut : on réessaie alors avec l'option qui l'autorise.
+if ! python3 -m pip install --user ansible pywinrm; then
+    python3 -m pip install --user --break-system-packages ansible pywinrm
+fi
 
 # Rend les commandes ansible accessibles, maintenant et aux prochaines sessions
 export PATH="$HOME/.local/bin:$PATH"
