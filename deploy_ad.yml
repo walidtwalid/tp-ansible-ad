@@ -1,23 +1,38 @@
-# Playbook : déploie un domaine Active Directory et sa structure.
+# deploy_ad.yml : transforme un Windows Server vierge en contrôleur de domaine,
+# puis crée une OU et un groupe pour chaque service.
 # Lancement : ansible-playbook deploy_ad.yml
 #
-# On DÉCRIT l'état voulu (domaine, unités d'organisation, groupes).
-# Ansible compare avec l'existant et ne fait que ce qui manque :
+# Un playbook DÉCRIT l'état voulu. Ansible compare avec ce qui existe déjà
+# et ne fait que ce qui manque :
 #   - "changed" = Ansible a modifié quelque chose
 #   - "ok"      = c'était déjà conforme, rien n'a été touché
 
+# "name" : le titre du playbook, affiché au lancement.
+# "hosts" : sur quelles machines il s'applique. "windows" = le groupe [windows]
+#           de inventory.ini, donc votre serveur.
+# "vars_files" : le fichier où sont rangées les variables (domaine, services...).
 - name: Déployer le domaine Active Directory du TP
   hosts: windows
   vars_files:
     - vars/ad.yml
 
+  # "tasks" : la liste des tâches, exécutées dans l'ordre, de haut en bas.
+  # Chaque tâche = un "name" (ce qu'elle fait) + un module (l'outil utilisé)
+  # + les paramètres du module, décalés en dessous.
   tasks:
+
+    # Module win_feature : installe un rôle ou une fonctionnalité Windows.
+    # À la main : Gestionnaire de serveur > Ajouter des rôles > AD DS.
     - name: Installer le rôle AD DS et ses outils d'administration
       ansible.windows.win_feature:
         name: AD-Domain-Services
         include_management_tools: true
-        state: present
+        state: present            # present = "doit être installé"
 
+    # Module microsoft.ad.domain : crée une nouvelle forêt et un domaine.
+    # À la main : "Promouvoir ce serveur en contrôleur de domaine".
+    # {{ domaine }} = la valeur de la variable "domaine" lue dans vars/ad.yml.
+    # reboot: true = Ansible redémarre le serveur et attend qu'il revienne.
     - name: Créer le domaine (promotion en contrôleur de domaine + redémarrage)
       microsoft.ad.domain:
         dns_domain_name: "{{ domaine }}"
@@ -25,27 +40,42 @@
         safe_mode_password: "{{ mot_de_passe_dsrm }}"
         reboot: true
 
+    # Module win_wait_for : attend qu'un port réponde.
+    # Après le redémarrage, l'annuaire met un peu de temps à démarrer.
+    # Le port 9389 est celui des services web Active Directory, utilisés par
+    # les modules microsoft.ad.* des tâches suivantes.
     - name: Attendre que les services web Active Directory répondent (port 9389)
       ansible.windows.win_wait_for:
         port: 9389
-        timeout: 600
+        timeout: 600              # au maximum 600 secondes (10 minutes)
 
+    # Module set_fact : crée une nouvelle variable pendant l'exécution.
+    # Ici, domaine_dn = "DC=tp,DC=local" (le format qu'Active Directory utilise
+    # pour désigner un emplacement). Pas besoin de comprendre la formule,
+    # retenez seulement son résultat.
     - name: Calculer le chemin LDAP du domaine (tp.local -> DC=tp,DC=local)
       ansible.builtin.set_fact:
         domaine_dn: "{{ domaine.split('.') | map('regex_replace', '^', 'DC=') | join(',') }}"
 
+    # Module microsoft.ad.ou : crée une unité d'organisation (OU).
+    # À la main : clic droit sur le domaine > Nouveau > Unité d'organisation.
+    # loop : la tâche est répétée pour chaque élément de la liste "services".
+    # item : l'élément en cours ("Informatique", puis "RH", puis "Commercial").
     - name: Créer une unité d'organisation par service
       microsoft.ad.ou:
         name: "{{ item }}"
-        path: "{{ domaine_dn }}"
+        path: "{{ domaine_dn }}"  # l'OU est créée à la racine du domaine
         state: present
       loop: "{{ services }}"
 
+    # Module microsoft.ad.group : crée un groupe.
+    # À la main : clic droit sur l'OU > Nouveau > Groupe.
+    # Pour le service RH, cela donne le groupe GRP_RH dans OU=RH,DC=tp,DC=local.
     - name: Créer un groupe de sécurité par service, dans son unité
       microsoft.ad.group:
         name: "GRP_{{ item }}"
-        scope: global
-        category: security
+        scope: global             # étendue du groupe : globale
+        category: security       # type de groupe : sécurité
         path: "OU={{ item }},{{ domaine_dn }}"
         state: present
       loop: "{{ services }}"
