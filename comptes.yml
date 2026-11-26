@@ -17,6 +17,12 @@
     # PARTIE FOURNIE : ne pas modifier
     # =====================================================================
 
+    # Module read_csv : lit un fichier CSV ligne par ligne.
+    # delegate_to: localhost = cette tâche s'exécute sur la machine Linux
+    # (là où se trouve le fichier), et pas sur le serveur Windows.
+    # register: rh = le résultat est rangé dans la variable "rh".
+    # rh.list contient une entrée par employé, avec ses colonnes :
+    # item.Nom, item.Prenom, item.Service, item.Identifiant...
     - name: Lire le fichier RH (sur la machine Linux)
       community.general.read_csv:
         path: "{{ playbook_dir }}/employes.csv"
@@ -24,10 +30,19 @@
       register: rh
       delegate_to: localhost
 
+    # Même calcul que dans deploy_ad.yml : domaine_dn = "DC=tp,DC=local".
     - name: Calculer le chemin LDAP du domaine (tp.local -> DC=tp,DC=local)
       ansible.builtin.set_fact:
         domaine_dn: "{{ domaine.split('.') | map('regex_replace', '^', 'DC=') | join(',') }}"
 
+    # Les trois tâches suivantes trient les employés dans trois listes.
+    # loop : on passe sur chaque employé du fichier (rh.list).
+    # when : la tâche n'est faite que si TOUTES les conditions sont vraies.
+    #        Sinon, Ansible affiche "skipping" pour cet employé.
+    # to_datetime('%d/%m/%Y') : transforme "30/11/2026" en vraie date.
+    # now() : la date et l'heure actuelles.
+    # loop_control / label : affiche seulement l'identifiant à l'écran,
+    #        au lieu de toute la ligne du fichier.
     - name: Préparer la liste des employés présents (arrivés et pas encore partis)
       ansible.builtin.set_fact:
         presents: "{{ presents | default([]) + [item] }}"
@@ -57,6 +72,7 @@
         label: "{{ item.Identifiant }}"
       when: item.Service not in services
 
+    # Module debug : affiche un message à l'écran. Pratique pour vérifier.
     - name: Afficher le résumé
       ansible.builtin.debug:
         msg:
