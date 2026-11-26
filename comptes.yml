@@ -1,0 +1,106 @@
+# comptes.yml : crée et désactive les comptes des employés à partir du fichier RH.
+# Lancement : ansible-playbook comptes.yml
+#
+# Prérequis : deploy_ad.yml a déjà été lancé (domaine, OU des services, OU Départs).
+#
+# La première partie est fournie : elle lit employes.csv et prépare trois listes.
+# Votre travail : compléter les tâches marquées "A FAIRE", une par une.
+# Après chaque tâche ajoutée, relancez le playbook pour la tester.
+
+- name: Gérer les comptes des employés à partir du fichier RH
+  hosts: windows
+  vars_files:
+    - vars/ad.yml
+
+  tasks:
+    # =====================================================================
+    # PARTIE FOURNIE : ne pas modifier
+    # =====================================================================
+
+    - name: Lire le fichier RH (sur la machine Linux)
+      community.general.read_csv:
+        path: "{{ playbook_dir }}/employes.csv"
+        delimiter: ";"
+      register: rh
+      delegate_to: localhost
+
+    - name: Calculer le chemin LDAP du domaine (tp.local -> DC=tp,DC=local)
+      ansible.builtin.set_fact:
+        domaine_dn: "{{ domaine.split('.') | map('regex_replace', '^', 'DC=') | join(',') }}"
+
+    - name: Préparer la liste des employés présents (arrivés et pas encore partis)
+      ansible.builtin.set_fact:
+        presents: "{{ presents | default([]) + [item] }}"
+      loop: "{{ rh.list }}"
+      loop_control:
+        label: "{{ item.Identifiant }}"
+      when:
+        - item.Service in services
+        - (item.DateArrivee | to_datetime('%d/%m/%Y')) <= now()
+        - item.DateDepart == "" or (item.DateDepart | to_datetime('%d/%m/%Y')) > now()
+
+    - name: Préparer la liste des employés partis
+      ansible.builtin.set_fact:
+        partis: "{{ partis | default([]) + [item] }}"
+      loop: "{{ rh.list }}"
+      loop_control:
+        label: "{{ item.Identifiant }}"
+      when:
+        - item.DateDepart != ""
+        - (item.DateDepart | to_datetime('%d/%m/%Y')) <= now()
+
+    - name: Préparer la liste des employés dont le service n'existe pas
+      ansible.builtin.set_fact:
+        inconnus: "{{ inconnus | default([]) + [item] }}"
+      loop: "{{ rh.list }}"
+      loop_control:
+        label: "{{ item.Identifiant }}"
+      when: item.Service not in services
+
+    - name: Afficher le résumé
+      ansible.builtin.debug:
+        msg:
+          - "Présents : {{ presents | default([]) | map(attribute='Identifiant') | list }}"
+          - "Partis : {{ partis | default([]) | map(attribute='Identifiant') | list }}"
+          - "Service inconnu, non traités : {{ inconnus | default([]) | map(attribute='Identifiant') | list }}"
+
+    # =====================================================================
+    # A VOUS DE JOUER
+    # =====================================================================
+
+    # Exemple déjà écrit : affiche chaque employé présent.
+    # Inspirez-vous de sa structure (name, module, loop, loop_control).
+    - name: Exemple - afficher chaque employé présent
+      ansible.builtin.debug:
+        msg: "{{ item.Prenom }} {{ item.Nom }} travaille au service {{ item.Service }}"
+      loop: "{{ presents | default([]) }}"
+      loop_control:
+        label: "{{ item.Identifiant }}"
+
+    # A FAIRE 1 : créer le compte de chaque employé présent.
+    #   Module : microsoft.ad.user
+    #   Boucle : sur la liste "presents", comme l'exemple.
+    #   Paramètres à renseigner :
+    #     name              l'identifiant (colonne Identifiant)
+    #     firstname         le prénom
+    #     surname           le nom
+    #     display_name      "Prénom Nom"
+    #     path              l'OU du service : "OU=<le service>,{{ domaine_dn }}"
+    #     password          la variable mot_de_passe_initial (dans vars/ad.yml)
+    #     update_password   on_create   (mot de passe défini seulement à la création)
+    #     password_expired  true        (changement obligatoire à la première connexion)
+    #     enabled           true
+    #     state             present
+    #   Doc : https://docs.ansible.com/ansible/latest/collections/microsoft/ad/user_module.html
+
+
+    # A FAIRE 2 : ajouter chaque employé présent au groupe de son service.
+    #   Module : microsoft.ad.group
+    #   Le groupe d'un service s'appelle GRP_<le service>.
+    #   Cherchez dans la doc le paramètre qui permet d'ajouter des membres.
+    #   Doc : https://docs.ansible.com/ansible/latest/collections/microsoft/ad/group_module.html
+
+
+    # A FAIRE 3 : désactiver le compte de chaque employé parti
+    #   et le déplacer dans l'OU Départs.
+    #   Pas d'indice cette fois : relisez la doc de microsoft.ad.user.
