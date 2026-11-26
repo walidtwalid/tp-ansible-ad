@@ -1,0 +1,14 @@
+# Réglages de connexion pour toutes les machines du groupe [windows].
+# Ansible ne passe pas par SSH pour Windows, mais par WinRM.
+
+ansible_connection: winrm
+ansible_port: 5985
+ansible_winrm_transport: ntlm
+ansible_winrm_server_cert_validation: ignore
+
+# Compte administrateur du serveur (nom français par défaut : Administrateur).
+ansible_user: Administrateur
+
+# ATTENTION : mot de passe en clair, acceptable uniquement en TP.
+# En entreprise, on le chiffrerait avec ansible-vault.
+ansible_password: "<MOT_DE_PASSE_ADMINISTRATEUR>"
