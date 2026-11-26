@@ -1,0 +1,5 @@
+# Collections Ansible nécessaires au TP.
+# Installation : ansible-galaxy collection install -r requirements.yml
+collections:
+  - name: ansible.windows
+  - name: microsoft.ad
