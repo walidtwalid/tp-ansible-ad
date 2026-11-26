@@ -17,3 +17,6 @@ services:
   - Informatique
   - RH
   - Commercial
+
+# Mot de passe donné aux nouveaux comptes (à changer à la première connexion)
+mot_de_passe_initial: "Bienvenue2026!"
