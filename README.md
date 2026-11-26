@@ -9,10 +9,13 @@
 | `group_vars/windows.yml` | Réglages de connexion WinRM (mettre le mot de passe administrateur) |
 | `vars/ad.yml` | État voulu : domaine, services. **Le fichier que vous modifiez** |
 | `deploy_ad.yml` | Le playbook qui crée le domaine, les unités d'organisation et les groupes |
+| `comptes.yml` | Le playbook qui gère les comptes à partir du fichier RH. **À compléter** |
 | `ansible.cfg` | Indique à Ansible quel inventaire utiliser |
 | `requirements.yml` | Collections Ansible à installer |
 | `install.sh` | Installe Ansible et les collections sur la machine Linux en une commande |
-| `employes.csv` | Fichier RH d'exemple, à placer dans `C:\RH` sur le Windows Server (partie 5) |
+| `employes.csv` | Le fichier RH, lu par `comptes.yml` |
+| `MEMO.md` | Mémo Ansible : commandes, YAML, structure d'une tâche |
+| `ERREURS.md` | Les erreurs fréquentes et comment les corriger |
 
 > Les deux VM doivent avoir accès à Internet pour les étapes 1 et 2.
 > En réseau Host-Only, faites-les avant, ou ajoutez une seconde carte réseau en NAT.
@@ -68,7 +71,18 @@ Lisez le récapitulatif final (`ok`, `changed`, `failed`).
 3. Relancez : seules l'unité et le groupe du nouveau service passent en `changed`.
 4. Vérifiez dans « Utilisateurs et ordinateurs Active Directory » sur le serveur.
 
+## 6. Gérer les comptes
+
+```bash
+ansible-playbook comptes.yml --syntax-check
+ansible-playbook comptes.yml
+```
+
+Complétez les tâches « A FAIRE » de `comptes.yml` une par une, en relançant le playbook après chacune.
+
 ## En cas de problème
+
+Voir aussi `ERREURS.md`.
 
 - `win_ping` échoue : vérifier l'IP, le ping, le pare-feu, et que `enable-winrm.ps1` a bien été lancé.
 - Erreur d'authentification : vérifier le nom `Administrateur` et le mot de passe.
