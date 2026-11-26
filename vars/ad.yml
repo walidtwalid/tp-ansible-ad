@@ -1,0 +1,19 @@
+# État voulu de l'annuaire Active Directory.
+# C'est CE fichier que vous modifiez : ajoutez un service, relancez le playbook,
+# et Ansible ne crée que ce qui manque (idempotence).
+
+# Nom DNS du domaine à créer
+domaine: tp.local
+
+# Nom NetBIOS du domaine (15 caractères max, en majuscules)
+domaine_netbios: TP
+
+# Mot de passe du mode restauration des services d'annuaire (DSRM)
+# Doit respecter la complexité Windows. En clair : TP uniquement.
+mot_de_passe_dsrm: "<MOT_DE_PASSE_DSRM>"
+
+# Un service = une unité d'organisation + un groupe "GRP_<service>"
+services:
+  - Informatique
+  - RH
+  - Commercial
