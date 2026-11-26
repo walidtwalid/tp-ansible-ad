@@ -1,0 +1,51 @@
+# Playbook : déploie un domaine Active Directory et sa structure.
+# Lancement : ansible-playbook deploy_ad.yml
+#
+# On DÉCRIT l'état voulu (domaine, unités d'organisation, groupes).
+# Ansible compare avec l'existant et ne fait que ce qui manque :
+#   - "changed" = Ansible a modifié quelque chose
+#   - "ok"      = c'était déjà conforme, rien n'a été touché
+
+- name: Déployer le domaine Active Directory du TP
+  hosts: windows
+  vars_files:
+    - vars/ad.yml
+
+  tasks:
+    - name: Installer le rôle AD DS et ses outils d'administration
+      ansible.windows.win_feature:
+        name: AD-Domain-Services
+        include_management_tools: true
+        state: present
+
+    - name: Créer le domaine (promotion en contrôleur de domaine + redémarrage)
+      microsoft.ad.domain:
+        dns_domain_name: "{{ domaine }}"
+        domain_netbios_name: "{{ domaine_netbios }}"
+        safe_mode_password: "{{ mot_de_passe_dsrm }}"
+        reboot: true
+
+    - name: Attendre que les services web Active Directory répondent (port 9389)
+      ansible.windows.win_wait_for:
+        port: 9389
+        timeout: 600
+
+    - name: Calculer le chemin LDAP du domaine (tp.local -> DC=tp,DC=local)
+      ansible.builtin.set_fact:
+        domaine_dn: "{{ domaine.split('.') | map('regex_replace', '^', 'DC=') | join(',') }}"
+
+    - name: Créer une unité d'organisation par service
+      microsoft.ad.ou:
+        name: "{{ item }}"
+        path: "{{ domaine_dn }}"
+        state: present
+      loop: "{{ services }}"
+
+    - name: Créer un groupe de sécurité par service, dans son unité
+      microsoft.ad.group:
+        name: "GRP_{{ item }}"
+        scope: global
+        category: security
+        path: "OU={{ item }},{{ domaine_dn }}"
+        state: present
+      loop: "{{ services }}"
