@@ -11,7 +11,8 @@
 | `deploy_ad.yml` | Le playbook qui crée le domaine, les unités d'organisation et les groupes |
 | `ansible.cfg` | Indique à Ansible quel inventaire utiliser |
 | `requirements.yml` | Collections Ansible à installer |
-| `install.sh` | Installe Ansible et les collections sur la VM Ubuntu en une commande |
+| `install.sh` | Installe Ansible et les collections sur la machine Linux en une commande |
+| `employes.csv` | Fichier RH d'exemple, à placer dans `C:\RH` sur le Windows Server (partie 5) |
 
 > Les deux VM doivent avoir accès à Internet pour les étapes 1 et 2.
 > En réseau Host-Only, faites-les avant, ou ajoutez une seconde carte réseau en NAT.
@@ -22,11 +23,11 @@ Le serveur doit avoir une **adresse IP fixe** et un **mot de passe administrateu
 Lancer PowerShell en administrateur, puis :
 
 ```powershell
-Invoke-WebRequest -Uri "https://raw.githubusercontent.com/walidtwalid/tp-ansible-ad/main/enable-winrm.ps1" -OutFile enable-winrm.ps1
+Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/walidtwalid/tp-ansible-ad/main/enable-winrm.ps1" -OutFile enable-winrm.ps1
 powershell -ExecutionPolicy Bypass -File .\enable-winrm.ps1
 ```
 
-## 2. Sur la VM Ubuntu (Ubuntu 22.04)
+## 2. Sur la machine Linux (Debian ou Ubuntu)
 
 ```bash
 sudo apt update && sudo apt install -y git
@@ -63,7 +64,7 @@ Lisez le récapitulatif final (`ok`, `changed`, `failed`).
 ## 5. Tester l'idempotence
 
 1. Relancez `ansible-playbook deploy_ad.yml` sans rien changer : tout doit être `ok`, rien `changed`.
-2. Ajoutez un service dans `vars/ad.yml`, par exemple `- Comptabilite`.
+2. Ajoutez un service dans `vars/ad.yml`, par exemple `- Comptabilité`.
 3. Relancez : seules l'unité et le groupe du nouveau service passent en `changed`.
 4. Vérifiez dans « Utilisateurs et ordinateurs Active Directory » sur le serveur.
 
@@ -72,3 +73,5 @@ Lisez le récapitulatif final (`ok`, `changed`, `failed`).
 - `win_ping` échoue : vérifier l'IP, le ping, le pare-feu, et que `enable-winrm.ps1` a bien été lancé.
 - Erreur d'authentification : vérifier le nom `Administrateur` et le mot de passe.
 - Erreur « couldn't resolve module » : relancer `ansible-galaxy collection install -r requirements.yml`.
+- `Invoke-WebRequest` échoue avec une erreur TLS (anciennes versions de Windows Server) : lancer d'abord
+  `[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12`, puis recommencer.
